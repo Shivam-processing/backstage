@@ -53,6 +53,7 @@ function resolveTargetRef(
   extensionRoutes: Map<string, RouteRef | undefined>,
   fallbackRoutes: Map<string, RouteRef | undefined>,
   redirects: RouteRedirects,
+  externalRouteIds: Map<ExternalRouteRef, string>,
 ): readonly [RouteRef | undefined, string] {
   // First we figure out which absolute route ref we're dealing with, an if there was an sub route path to append.
   // For sub routes it will be the parent path, while for external routes it will be the bound route.
@@ -60,12 +61,15 @@ function resolveTargetRef(
   let path = '';
 
   if (OpaqueExternalRouteRef.isType(ref)) {
-    const id = OpaqueExternalRouteRef.toInternal(ref).getId?.();
+    const id =
+      externalRouteIds.get(ref) ??
+      OpaqueExternalRouteRef.toInternal(ref).getId?.();
     const bindingRef = id
       ? [...routeBindings.keys()].find(
           candidate =>
             OpaqueExternalRouteRef.isType(candidate) &&
-            OpaqueExternalRouteRef.toInternal(candidate).getId?.() === id,
+            (externalRouteIds.get(candidate) ??
+              OpaqueExternalRouteRef.toInternal(candidate).getId?.()) === id,
         ) ?? ref
       : ref;
     let resolvedRoute = routeBindings.get(bindingRef);
@@ -238,6 +242,7 @@ export class RouteResolver implements RouteResolutionApi {
     routeRefsById: Map<string, RouteRef | SubRouteRef>,
     installedExtensionIds: Iterable<string> = [],
     private readonly redirects = new RouteRedirects(),
+    private readonly externalRouteIds = new Map<ExternalRouteRef, string>(),
   ) {
     // An installed but unmounted target must not resolve through a fallback.
     for (const id of installedExtensionIds) {
@@ -357,6 +362,7 @@ export class RouteResolver implements RouteResolutionApi {
         this.extensionRoutes,
         this.fallbackRoutes,
         this.redirects,
+        this.externalRouteIds,
       );
     }
     for (const [externalRef, target] of this.routeBindings) {
@@ -393,6 +399,7 @@ export class RouteResolver implements RouteResolutionApi {
       this.extensionRoutes,
       this.fallbackRoutes,
       this.redirects,
+      this.externalRouteIds,
     );
     if (!targetRef) {
       return undefined;
